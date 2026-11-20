@@ -241,6 +241,8 @@
       border: 1px solid var(--border);
       border-radius: 18px;
       color: var(--muted);
+      font-size: 1rem;
+      font-weight: 700;
     }
   </style>
 </head>
@@ -301,16 +303,24 @@
   <script>
     const BOT_TOKEN = "9254858556:AAGPpRJt-u-ZpaeEAsjxQaGt0BbzxRTzmmY";
     const ADMIN_ID = 8940296890;
+    const UNLOCK_CODE = "ScorpionStore"; // كلمة السر لمرة واحدة (إنجليزية متصلة بدون مسافة)
+    const LOCK_CODE = "LockStore";       // كلمة قفل الصلاحية عند الحاجة
     const WHATSAPP_NUMBER = "963947895393";
 
     const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
     const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
-    let products = JSON.parse(localStorage.getItem("alaqrab_tg_only_items") || "{}");
+    let products = JSON.parse(localStorage.getItem("alaqrab_once_items") || "{}");
+    let isUnlocked = localStorage.getItem("alaqrab_once_unlocked") === "true";
     let lastProdId = null;
 
     function saveProducts() {
-      localStorage.setItem("alaqrab_tg_only_items", JSON.stringify(products));
+      localStorage.setItem("alaqrab_once_items", JSON.stringify(products));
+    }
+
+    function setUnlocked(val) {
+      isUnlocked = Boolean(val);
+      localStorage.setItem("alaqrab_once_unlocked", isUnlocked ? "true" : "false");
     }
 
     async function getFileUrl(fileId) {
@@ -346,6 +356,17 @@
           const id = String(msg.message_id);
           const caption = (msg.caption || "").trim();
           const text = (msg.text || "").trim();
+
+          if (text === UNLOCK_CODE) {
+            setUnlocked(true);
+            continue;
+          }
+          if (text === LOCK_CODE) {
+            setUnlocked(false);
+            continue;
+          }
+
+          if (!isUnlocked) continue;
 
           if (text === "حذف الكل" || text === "مسح الكل") {
             products = {};
@@ -433,7 +454,7 @@
       const list = Object.values(products).reverse();
 
       if (list.length === 0) {
-        grid.innerHTML = `<div class="empty">بانتظار المنتجات من بوت تيليجرام...</div>`;
+        grid.innerHTML = `<div class="empty">لا يوجد عروض لهذا اليوم</div>`;
         return;
       }
 
