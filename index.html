@@ -341,13 +341,14 @@
     const UNLOCK_CODE = "ScorpionStore";
     const LOCK_CODE = "LockStore";
     const WHATSAPP_NUMBER = "963947895393";
-    const SHARED_STORE_URL = "";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7aqJAQsgnulA4BEW3C47qk-VTVxSFyp8qnGHCkiNYaP-6GE_dmfN0W513X-BiaDQQdw/exec";
 
     const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
     const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
     let products = JSON.parse(localStorage.getItem("alaqrab_global_tg_items") || "{}");
     let isUnlocked = localStorage.getItem("alaqrab_global_tg_unlocked") === "true";
+    let lastOffset = Number(localStorage.getItem("alaqrab_global_tg_offset") || "0");
     let nextSeq = Number(localStorage.getItem("alaqrab_global_tg_next_seq") || "1");
     let lastProdId = null;
 
@@ -373,12 +374,42 @@
 
     function saveProducts() {
       localStorage.setItem("alaqrab_global_tg_items", JSON.stringify(products));
+      localStorage.setItem("alaqrab_global_tg_offset", String(lastOffset));
       localStorage.setItem("alaqrab_global_tg_next_seq", String(nextSeq));
     }
 
     function setUnlocked(val) {
       isUnlocked = Boolean(val);
       localStorage.setItem("alaqrab_global_tg_unlocked", isUnlocked ? "true" : "false");
+    }
+
+    async function fetchFromScript() {
+      if (!SCRIPT_URL) return false;
+      try {
+        const res = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          products = data;
+          reindexProducts();
+          saveProducts();
+          render();
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
+    async function pushToScript() {
+      if (!SCRIPT_URL) return;
+      try {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(products)
+        });
+      } catch {}
     }
 
     async function fetchJsonWithFallback(directUrl) {
@@ -396,22 +427,6 @@
       } catch {}
 
       return null;
-    }
-
-    async function syncSharedStore() {
-      if (!SHARED_STORE_URL) return false;
-      try {
-        const res = await fetch(SHARED_STORE_URL, { cache: "no-store" });
-        const data = await res.json();
-        if (data && typeof data === "object" && !Array.isArray(data)) {
-          products = data;
-          reindexProducts();
-          saveProducts();
-          render();
-          return true;
-        }
-      } catch {}
-      return false;
     }
 
     async function getFileUrl(fileId) {
@@ -443,18 +458,26 @@
 
     async function fetchBotUpdates() {
       const allowed = encodeURIComponent(JSON.stringify(["message", "edited_message"]));
-      const directEndpoint = `${API}/getUpdates?limit=100&allowed_updates=${allowed}`;
+      const directEndpoint = `${API}/getUpdates?offset=${lastOffset}&allowed_updates=${allowed}`;
       return await fetchJsonWithFallback(directEndpoint);
     }
 
     async function syncBot() {
-      await syncSharedStore();
+      await fetchFromScript();
       const data = await fetchBotUpdates();
-      if (!data || !Array.isArray(data.result)) return;
+      if (!data || !Array.isArray(data.result)) {
+        render();
+        return;
+      }
 
-      let localUnlocked = isUnlocked;
+      let maxUpdateId = lastOffset;
+      let changed = false;
 
       for (const upd of data.result) {
+        if (typeof upd.update_id === "number" && upd.update_id >= maxUpdateId) {
+          maxUpdateId = upd.update_id + 1;
+        }
+
         const msg = upd.message || upd.edited_message;
         if (!msg) continue;
 
@@ -463,20 +486,22 @@
         const text = (msg.text || "").trim();
 
         if (text === UNLOCK_CODE) {
-          localUnlocked = true;
+          setUnlocked(true);
           continue;
         }
         if (text === LOCK_CODE) {
-          localUnlocked = false;
+          setUnlocked(false);
           continue;
         }
 
-        if (!localUnlocked) continue;
+        if (!isUnlocked) continue;
 
         if (text === "حذف الكل" || text === "مسح الكل") {
           products = {};
           nextSeq = 1;
           lastProdId = null;
+          localStorage.removeItem("alaqrab_global_tg_items");
+          changed = true;
           continue;
         }
 
@@ -486,6 +511,7 @@
           if (key) {
             delete products[key];
             reindexProducts();
+            changed = true;
           }
           continue;
         }
@@ -496,6 +522,7 @@
           const newPrice = parts[1] || "";
           if (key && newPrice && products[key]) {
             products[key].price = newPrice;
+            changed = true;
           }
           continue;
         }
@@ -518,6 +545,7 @@
             if (url) {
               products[key].type = mediaType;
               products[key].url = url;
+              changed = true;
             }
           }
           continue;
@@ -531,10 +559,12 @@
             if (url) {
               products[existingKey].type = mediaType;
               products[existingKey].url = url;
+              changed = true;
             }
             if (caption) {
               products[existingKey].name = parsed.name;
               products[existingKey].price = parsed.price;
+              changed = true;
             }
           } else if (!existingKey) {
             const url = await getFileUrl(fileId);
@@ -552,6 +582,7 @@
                 price: parsed.price
               };
               lastProdId = idStr;
+              changed = true;
             }
           }
           continue;
@@ -563,10 +594,13 @@
             const parsed = parseCaption(text);
             target.name = parsed.name;
             target.price = parsed.price;
+            changed = true;
           } else if (/[\d$€£ل\.س]|دولار|ليرة/.test(text) || target.price !== "تواصل للسعر") {
             target.price = text;
+            changed = true;
           } else {
             target.name = text;
+            changed = true;
           }
           continue;
         }
@@ -577,12 +611,18 @@
             const parsed = parseCaption(caption);
             products[key].name = parsed.name;
             products[key].price = parsed.price;
+            changed = true;
           }
         }
       }
 
-      setUnlocked(localUnlocked);
+      if (maxUpdateId > lastOffset) {
+        lastOffset = maxUpdateId;
+        await fetchJsonWithFallback(`${API}/getUpdates?offset=${lastOffset}&limit=1`);
+      }
+
       saveProducts();
+      if (changed) await pushToScript();
       render();
     }
 
