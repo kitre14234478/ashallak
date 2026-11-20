@@ -341,19 +341,40 @@
     const UNLOCK_CODE = "ScorpionStore";
     const LOCK_CODE = "LockStore";
     const WHATSAPP_NUMBER = "963947895393";
-    const SHARED_SYNC_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(
-      `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?allowed_updates=${encodeURIComponent(JSON.stringify(["message", "edited_message"]))}`
-    );
 
     const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
     const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
     let products = JSON.parse(localStorage.getItem("alaqrab_global_tg_items") || "{}");
     let isUnlocked = localStorage.getItem("alaqrab_global_tg_unlocked") === "true";
+    let lastOffset = Number(localStorage.getItem("alaqrab_global_tg_offset") || "0");
+    let nextSeq = Number(localStorage.getItem("alaqrab_global_tg_next_seq") || "1");
     let lastProdId = null;
+
+    function reindexProducts() {
+      const sorted = Object.values(products).sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0));
+      if (sorted.length === 0) {
+        products = {};
+        nextSeq = 1;
+        lastProdId = null;
+        return;
+      }
+      const rebuilt = {};
+      let counter = 1;
+      for (const item of sorted) {
+        const seqNum = counter++;
+        const idStr = String(seqNum);
+        rebuilt[idStr] = { ...item, id: idStr, seq: seqNum };
+      }
+      products = rebuilt;
+      nextSeq = counter;
+      lastProdId = String(counter - 1);
+    }
 
     function saveProducts() {
       localStorage.setItem("alaqrab_global_tg_items", JSON.stringify(products));
+      localStorage.setItem("alaqrab_global_tg_offset", String(lastOffset));
+      localStorage.setItem("alaqrab_global_tg_next_seq", String(nextSeq));
     }
 
     function setUnlocked(val) {
@@ -361,24 +382,29 @@
       localStorage.setItem("alaqrab_global_tg_unlocked", isUnlocked ? "true" : "false");
     }
 
-    async function getFileUrl(fileId) {
-      const directUrl = `${FILE_API}/getFile?file_id=${encodeURIComponent(fileId)}`;
+    async function fetchJsonWithFallback(directUrl) {
       try {
-        const res = await fetch(`${API}/getFile?file_id=${encodeURIComponent(fileId)}`);
+        const res = await fetch(directUrl, { cache: "no-store" });
         const data = await res.json();
-        if (data.ok && data.result?.file_path) {
-          return `${FILE_API}/${data.result.file_path}`;
-        }
+        if (data && data.ok) return data;
       } catch {}
 
       try {
-        const proxyRes = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(directUrl));
+        const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(directUrl);
+        const proxyRes = await fetch(proxyUrl, { cache: "no-store" });
         const data = await proxyRes.json();
-        if (data.ok && data.result?.file_path) {
-          return `${FILE_API}/${data.result.file_path}`;
-        }
+        if (data && data.ok) return data;
       } catch {}
 
+      return null;
+    }
+
+    async function getFileUrl(fileId) {
+      const directUrl = `${API}/getFile?file_id=${encodeURIComponent(fileId)}`;
+      const data = await fetchJsonWithFallback(directUrl);
+      if (data && data.result?.file_path) {
+        return `${FILE_API}/${data.result.file_path}`;
+      }
       return null;
     }
 
@@ -390,32 +416,37 @@
       };
     }
 
-    async function fetchBotUpdates() {
-      const directEndpoint = `${API}/getUpdates?allowed_updates=${encodeURIComponent(JSON.stringify(["message", "edited_message"]))}`;
-      try {
-        const res = await fetch(directEndpoint);
-        const data = await res.json();
-        if (data && data.ok) return data;
-      } catch {}
-
-      try {
-        const res = await fetch(SHARED_SYNC_URL);
-        const data = await res.json();
-        if (data && data.ok) return data;
-      } catch {}
-
+    function findProductKey(code) {
+      const clean = String(code || "").trim().replace(/^#/, "");
+      if (!clean) return null;
+      if (products[clean]) return clean;
+      for (const [key, item] of Object.entries(products)) {
+        if (String(item.msgId) === clean || String(item.id) === clean) return key;
+      }
       return null;
+    }
+
+    async function fetchBotUpdates() {
+      const allowed = encodeURIComponent(JSON.stringify(["message", "edited_message"]));
+      const directEndpoint = `${API}/getUpdates?offset=${lastOffset}&allowed_updates=${allowed}`;
+      return await fetchJsonWithFallback(directEndpoint);
     }
 
     async function syncBot() {
       const data = await fetchBotUpdates();
       if (!data || !Array.isArray(data.result)) return;
 
+      let maxUpdateId = lastOffset;
+
       for (const upd of data.result) {
+        if (typeof upd.update_id === "number" && upd.update_id >= maxUpdateId) {
+          maxUpdateId = upd.update_id + 1;
+        }
+
         const msg = upd.message || upd.edited_message;
         if (!msg) continue;
 
-        const id = String(msg.message_id);
+        const msgId = String(msg.message_id);
         const caption = (msg.caption || "").trim();
         const text = (msg.text || "").trim();
 
@@ -432,23 +463,28 @@
 
         if (text === "حذف الكل" || text === "مسح الكل") {
           products = {};
+          nextSeq = 1;
           lastProdId = null;
+          localStorage.removeItem("alaqrab_global_tg_items");
           continue;
         }
 
         if (text.startsWith("حذف ")) {
-          const targetId = text.replace("حذف ", "").trim().replace(/^#/, "");
-          delete products[targetId];
-          if (lastProdId === targetId) lastProdId = null;
+          const targetId = text.replace("حذف ", "").trim();
+          const key = findProductKey(targetId);
+          if (key) {
+            delete products[key];
+            reindexProducts();
+          }
           continue;
         }
 
         if (text.startsWith("سعر ")) {
           const parts = text.replace("سعر ", "").trim().split("|").map(s => s.trim());
-          const targetId = (parts[0] || "").replace(/^#/, "");
+          const key = findProductKey(parts[0] || "");
           const newPrice = parts[1] || "";
-          if (targetId && newPrice && products[targetId]) {
-            products[targetId].price = newPrice;
+          if (key && newPrice && products[key]) {
+            products[key].price = newPrice;
           }
           continue;
         }
@@ -464,23 +500,48 @@
         }
 
         if (mediaType && caption.startsWith("تعديل ")) {
-          const targetId = caption.replace("تعديل ", "").trim().replace(/^#/, "");
-          if (products[targetId]) {
+          const targetId = caption.replace("تعديل ", "").trim();
+          const key = findProductKey(targetId);
+          if (key && products[key]) {
             const url = await getFileUrl(fileId);
             if (url) {
-              products[targetId].type = mediaType;
-              products[targetId].url = url;
+              products[key].type = mediaType;
+              products[key].url = url;
             }
           }
           continue;
         }
 
         if (mediaType) {
-          const url = await getFileUrl(fileId);
-          if (url) {
+          const existingKey = findProductKey(msgId);
+          if (existingKey && upd.edited_message) {
+            const url = await getFileUrl(fileId);
             const parsed = parseCaption(caption);
-            products[id] = { id, type: mediaType, url, name: parsed.name, price: parsed.price };
-            lastProdId = id;
+            if (url) {
+              products[existingKey].type = mediaType;
+              products[existingKey].url = url;
+            }
+            if (caption) {
+              products[existingKey].name = parsed.name;
+              products[existingKey].price = parsed.price;
+            }
+          } else if (!existingKey) {
+            const url = await getFileUrl(fileId);
+            if (url) {
+              const seqNum = nextSeq++;
+              const idStr = String(seqNum);
+              const parsed = parseCaption(caption);
+              products[idStr] = {
+                id: idStr,
+                seq: seqNum,
+                msgId,
+                type: mediaType,
+                url,
+                name: parsed.name,
+                price: parsed.price
+              };
+              lastProdId = idStr;
+            }
           }
           continue;
         }
@@ -499,11 +560,19 @@
           continue;
         }
 
-        if (upd.edited_message && products[id] && caption) {
-          const parsed = parseCaption(caption);
-          products[id].name = parsed.name;
-          products[id].price = parsed.price;
+        if (upd.edited_message && caption) {
+          const key = findProductKey(msgId);
+          if (key && products[key]) {
+            const parsed = parseCaption(caption);
+            products[key].name = parsed.name;
+            products[key].price = parsed.price;
+          }
         }
+      }
+
+      if (maxUpdateId > lastOffset) {
+        lastOffset = maxUpdateId;
+        await fetchJsonWithFallback(`${API}/getUpdates?offset=${lastOffset}&limit=1`);
       }
 
       saveProducts();
@@ -512,7 +581,9 @@
 
     function render() {
       const grid = document.getElementById("storeGrid");
-      const list = Object.values(products).reverse();
+      const list = Object.values(products)
+        .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+        .reverse();
 
       if (list.length === 0) {
         grid.innerHTML = `<div class="empty">لا يوجد عروض لهذا اليوم</div>`;
