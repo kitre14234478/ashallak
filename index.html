@@ -339,7 +339,7 @@
   <script>
     const WHATSAPP_NUMBER = "963947895393";
     const STORE_API = "https://script.google.com/macros/s/AKfycby9UHZMVXKS2fl98hDQCONmi5nmutCWmExaPh_HLV8MRmga6xkilEiDHGmWp1h06zWgcg/exec";
-    let products = {};
+    let products = [];
 
     function escapeHtml(str) {
       return String(str ?? "")
@@ -357,8 +357,15 @@
           return;
         }
         const data = await res.json();
-        if (data && typeof data === "object" && !Array.isArray(data)) {
+
+        if (data && Array.isArray(data.products)) {
+          products = data.products;
+          render();
+        } else if (Array.isArray(data)) {
           products = data;
+          render();
+        } else if (data && typeof data === "object") {
+          products = Object.values(data).filter(v => v && typeof v === "object" && "name" in v);
           render();
         }
       } catch (err) {
@@ -368,8 +375,11 @@
 
     function render() {
       const grid = document.getElementById("storeGrid");
-      const list = Object.values(products)
-        .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+      if (!grid) return;
+
+      const list = [...products]
+        .filter(item => item && typeof item === "object")
+        .sort((a, b) => Number(a.seq || a.id || 0) - Number(b.seq || b.id || 0))
         .reverse();
 
       if (list.length === 0) {
@@ -378,17 +388,17 @@
       }
 
       grid.innerHTML = list.map(item => {
-        const safeId = escapeHtml(item.id);
-        const safeName = escapeHtml(item.name);
-        const safePrice = escapeHtml(item.price);
-        const safeUrl = escapeHtml(item.url);
+        const safeId = escapeHtml(item.id || item.seq || "");
+        const safeName = escapeHtml(item.name || "منتج");
+        const safePrice = escapeHtml(item.price || "");
+        const safeUrl = escapeHtml(item.url || "");
 
         const media = item.type === "video"
           ? `<video src="${safeUrl}" controls playsinline preload="metadata"></video>`
-          : `<img src="${safeUrl}" alt="${safeName}" loading="lazy" />`;
+          : (safeUrl ? `<img src="${safeUrl}" alt="${safeName}" loading="lazy" />` : "");
 
         const waText = encodeURIComponent(
-          `مرحباً متجر العقرب، أريد طلب المنتج:\n• الاسم: ${item.name}\n• السعر: ${item.price}\n• الرقم: #${item.id}`
+          `مرحباً متجر العقرب، أريد طلب المنتج:\n• الاسم: ${item.name || "منتج"}\n• السعر: ${item.price || ""}\n• الرقم: #${item.id || item.seq || ""}`
         );
         const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${waText}`;
 
