@@ -340,6 +340,7 @@
     const WHATSAPP_NUMBER = "963947895393";
     const STORE_API = "https://script.google.com/macros/s/AKfycby9UHZMVXKS2fl98hDQCONmi5nmutCWmExaPh_HLV8MRmga6xkilEiDHGmWp1h06zWgcg/exec";
     let products = [];
+    let lastSignature = "";
 
     function escapeHtml(str) {
       return String(str ?? "")
@@ -347,6 +348,27 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+    }
+
+    function getProductsSignature(list) {
+      return JSON.stringify(
+        list.map(item => ({
+          id: item.id || item.seq || "",
+          seq: item.seq || "",
+          type: item.type || "",
+          url: item.url || "",
+          name: item.name || "",
+          price: item.price || ""
+        }))
+      );
+    }
+
+    function isAnyVideoPlaying() {
+      const videos = document.querySelectorAll("#storeGrid video");
+      for (const v of videos) {
+        if (!v.paused && !v.ended) return true;
+      }
+      return false;
     }
 
     async function loadProducts() {
@@ -358,16 +380,27 @@
         }
         const data = await res.json();
 
+        let nextList = [];
         if (data && Array.isArray(data.products)) {
-          products = data.products;
-          render();
+          nextList = data.products;
         } else if (Array.isArray(data)) {
-          products = data;
-          render();
+          nextList = data;
         } else if (data && typeof data === "object") {
-          products = Object.values(data).filter(v => v && typeof v === "object" && "name" in v);
-          render();
+          nextList = Object.values(data).filter(v => v && typeof v === "object" && "name" in v);
         }
+
+        const nextSignature = getProductsSignature(nextList);
+        if (nextSignature === lastSignature) {
+          return;
+        }
+
+        if (isAnyVideoPlaying()) {
+          return;
+        }
+
+        lastSignature = nextSignature;
+        products = nextList;
+        render();
       } catch (err) {
         console.error("Fetch error:", err);
       }
@@ -394,7 +427,7 @@
         const safeUrl = escapeHtml(item.url || "");
 
         const media = item.type === "video"
-          ? `<video src="${safeUrl}" controls playsinline preload="metadata"></video>`
+          ? `<video src="${safeUrl}" controls playsinline preload="auto"></video>`
           : (safeUrl ? `<img src="${safeUrl}" alt="${safeName}" loading="lazy" />` : "");
 
         const waText = encodeURIComponent(
@@ -425,7 +458,7 @@
 
     render();
     loadProducts();
-    setInterval(loadProducts, 4000);
+    setInterval(loadProducts, 60000);
   </script>
 
 </body>
