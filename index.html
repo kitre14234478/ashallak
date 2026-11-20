@@ -341,13 +341,13 @@
     const UNLOCK_CODE = "ScorpionStore";
     const LOCK_CODE = "LockStore";
     const WHATSAPP_NUMBER = "963947895393";
+    const SHARED_STORE_URL = "";
 
     const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
     const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
     let products = JSON.parse(localStorage.getItem("alaqrab_global_tg_items") || "{}");
     let isUnlocked = localStorage.getItem("alaqrab_global_tg_unlocked") === "true";
-    let lastOffset = Number(localStorage.getItem("alaqrab_global_tg_offset") || "0");
     let nextSeq = Number(localStorage.getItem("alaqrab_global_tg_next_seq") || "1");
     let lastProdId = null;
 
@@ -373,7 +373,6 @@
 
     function saveProducts() {
       localStorage.setItem("alaqrab_global_tg_items", JSON.stringify(products));
-      localStorage.setItem("alaqrab_global_tg_offset", String(lastOffset));
       localStorage.setItem("alaqrab_global_tg_next_seq", String(nextSeq));
     }
 
@@ -399,8 +398,24 @@
       return null;
     }
 
+    async function syncSharedStore() {
+      if (!SHARED_STORE_URL) return false;
+      try {
+        const res = await fetch(SHARED_STORE_URL, { cache: "no-store" });
+        const data = await res.json();
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          products = data;
+          reindexProducts();
+          saveProducts();
+          render();
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
     async function getFileUrl(fileId) {
-      const directUrl = `${API}/getFile?file_id=${encodeURIComponent(fileId)}`;
+      const directUrl = `${FILE_API}/getFile?file_id=${encodeURIComponent(fileId)}`;
       const data = await fetchJsonWithFallback(directUrl);
       if (data && data.result?.file_path) {
         return `${FILE_API}/${data.result.file_path}`;
@@ -428,21 +443,18 @@
 
     async function fetchBotUpdates() {
       const allowed = encodeURIComponent(JSON.stringify(["message", "edited_message"]));
-      const directEndpoint = `${API}/getUpdates?offset=${lastOffset}&allowed_updates=${allowed}`;
+      const directEndpoint = `${API}/getUpdates?limit=100&allowed_updates=${allowed}`;
       return await fetchJsonWithFallback(directEndpoint);
     }
 
     async function syncBot() {
+      await syncSharedStore();
       const data = await fetchBotUpdates();
       if (!data || !Array.isArray(data.result)) return;
 
-      let maxUpdateId = lastOffset;
+      let localUnlocked = isUnlocked;
 
       for (const upd of data.result) {
-        if (typeof upd.update_id === "number" && upd.update_id >= maxUpdateId) {
-          maxUpdateId = upd.update_id + 1;
-        }
-
         const msg = upd.message || upd.edited_message;
         if (!msg) continue;
 
@@ -451,21 +463,20 @@
         const text = (msg.text || "").trim();
 
         if (text === UNLOCK_CODE) {
-          setUnlocked(true);
+          localUnlocked = true;
           continue;
         }
         if (text === LOCK_CODE) {
-          setUnlocked(false);
+          localUnlocked = false;
           continue;
         }
 
-        if (!isUnlocked) continue;
+        if (!localUnlocked) continue;
 
         if (text === "حذف الكل" || text === "مسح الكل") {
           products = {};
           nextSeq = 1;
           lastProdId = null;
-          localStorage.removeItem("alaqrab_global_tg_items");
           continue;
         }
 
@@ -570,11 +581,7 @@
         }
       }
 
-      if (maxUpdateId > lastOffset) {
-        lastOffset = maxUpdateId;
-        await fetchJsonWithFallback(`${API}/getUpdates?offset=${lastOffset}&limit=1`);
-      }
-
+      setUnlocked(localUnlocked);
       saveProducts();
       render();
     }
