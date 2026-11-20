@@ -190,18 +190,9 @@
       box-shadow: 0 4px 16px rgba(251, 113, 133, 0.25);
     }
 
-    .sync-bar {
-      max-width: 1140px;
-      margin: 12px auto 0;
-      padding: 0 14px;
-      font-size: 0.8rem;
-      color: var(--muted);
-      text-align: center;
-    }
-
     .grid {
       max-width: 1140px;
-      margin: 14px auto 20px;
+      margin: 20px auto;
       padding: 0 14px;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
@@ -343,304 +334,23 @@
     </div>
   </header>
 
-  <div class="sync-bar" id="syncStatus">جاري مزامنة المتجر...</div>
   <main class="grid" id="storeGrid"></main>
 
   <script>
-    const BOT_TOKEN = "9254858556:AAGPpRJt-u-ZpaeEAsjxQaGt0BbzxRTzmmY";
-    const UNLOCK_CODE = "ScorpionStore";
-    const LOCK_CODE = "LockStore";
     const WHATSAPP_NUMBER = "963947895393";
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7aqJAQsgnulA4BEW3C47qk-VTVxSFyp8qnGHCkiNYaP-6GE_dmfN0W513X-BiaDQQdw/exec";
+    const STORE_API = "https://script.google.com/macros/s/AKfycbx7aqJAQsgnulA4BEW3C47qk-VTVxSFyp8qnGHCkiNYaP-6GE_dmfN0W513X-BiaDQQdw/exec";
+    let products = {};
 
-    const API = `https://api.telegram.org/bot${BOT_TOKEN}`;
-    const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
-
-    let products = JSON.parse(localStorage.getItem("alaqrab_global_tg_items") || "{}");
-    let isUnlocked = localStorage.getItem("alaqrab_global_tg_unlocked") === "true";
-    let nextSeq = Number(localStorage.getItem("alaqrab_global_tg_next_seq") || "1");
-    let lastProdId = null;
-
-    function setStatus(msg) {
-      const el = document.getElementById("syncStatus");
-      if (el) el.textContent = msg;
-    }
-
-    function reindexProducts() {
-      const sorted = Object.values(products).sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0));
-      if (sorted.length === 0) {
-        products = {};
-        nextSeq = 1;
-        lastProdId = null;
-        return;
-      }
-      const rebuilt = {};
-      let counter = 1;
-      for (const item of sorted) {
-        const seqNum = counter++;
-        const idStr = String(seqNum);
-        rebuilt[idStr] = { ...item, id: idStr, seq: seqNum };
-      }
-      products = rebuilt;
-      nextSeq = counter;
-      lastProdId = String(counter - 1);
-    }
-
-    function saveProducts() {
-      localStorage.setItem("alaqrab_global_tg_items", JSON.stringify(products));
-      localStorage.setItem("alaqrab_global_tg_next_seq", String(nextSeq));
-    }
-
-    function setUnlocked(val) {
-      isUnlocked = Boolean(val);
-      localStorage.setItem("alaqrab_global_tg_unlocked", isUnlocked ? "true" : "false");
-    }
-
-    async function fetchFromScript() {
-      if (!SCRIPT_URL) return false;
+    async function loadProducts() {
       try {
-        const res = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) return false;
+        const res = await fetch(`${STORE_API}?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
         const data = await res.json();
         if (data && typeof data === "object" && !Array.isArray(data)) {
           products = data;
-          reindexProducts();
-          saveProducts();
           render();
-          return true;
         }
       } catch {}
-      return false;
-    }
-
-    async function pushToScript() {
-      if (!SCRIPT_URL) return;
-      const jsonStr = JSON.stringify(products);
-      try {
-        await fetch(`${SCRIPT_URL}?save=${encodeURIComponent(jsonStr)}&t=${Date.now()}`, {
-          cache: "no-store"
-        });
-      } catch {}
-      try {
-        await fetch(SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: jsonStr
-        });
-      } catch {}
-    }
-
-    async function fetchJsonWithFallback(directUrl) {
-      const proxies = [
-        directUrl,
-        "https://api.allorigins.win/raw?url=" + encodeURIComponent(directUrl),
-        "https://corsproxy.io/?" + encodeURIComponent(directUrl)
-      ];
-      for (const url of proxies) {
-        try {
-          const res = await fetch(url, { cache: "no-store" });
-          const data = await res.json();
-          if (data && data.ok) return data;
-        } catch {}
-      }
-      return null;
-    }
-
-    async function getFileUrl(fileId) {
-      const directUrl = `${FILE_API}/getFile?file_id=${encodeURIComponent(fileId)}`;
-      const data = await fetchJsonWithFallback(directUrl);
-      if (data && data.result?.file_path) {
-        return `${FILE_API}/${data.result.file_path}`;
-      }
-      return null;
-    }
-
-    function parseCaption(caption = "") {
-      const parts = caption.trim().split("|").map(s => s.trim());
-      return {
-        name: parts[0] || "منتج متجر العقرب",
-        price: parts[1] || "تواصل للسعر"
-      };
-    }
-
-    function findProductKey(code) {
-      const clean = String(code || "").trim().replace(/^#/, "");
-      if (!clean) return null;
-      if (products[clean]) return clean;
-      for (const [key, item] of Object.entries(products)) {
-        if (String(item.msgId) === clean || String(item.id) === clean) return key;
-      }
-      return null;
-    }
-
-    async function fetchBotUpdates() {
-      const allowed = encodeURIComponent(JSON.stringify(["message", "edited_message"]));
-      const directEndpoint = `${API}/getUpdates?limit=100&allowed_updates=${allowed}`;
-      return await fetchJsonWithFallback(directEndpoint);
-    }
-
-    async function syncBot() {
-      const loadedShared = await fetchFromScript();
-      const data = await fetchBotUpdates();
-
-      if (!data || !Array.isArray(data.result)) {
-        setStatus(loadedShared ? "متصل بالمتجر العام" : "تعذر جلب رسائل البوت مباشرة من المتصفح");
-        render();
-        return;
-      }
-
-      let localUnlocked = isUnlocked;
-      let changed = false;
-
-      for (const upd of data.result) {
-        const msg = upd.message || upd.edited_message;
-        if (!msg) continue;
-
-        const msgId = String(msg.message_id);
-        const caption = (msg.caption || "").trim();
-        const text = (msg.text || "").trim();
-
-        if (text === UNLOCK_CODE) {
-          localUnlocked = true;
-          continue;
-        }
-        if (text === LOCK_CODE) {
-          localUnlocked = false;
-          continue;
-        }
-
-        if (!localUnlocked) continue;
-
-        if (text === "حذف الكل" || text === "مسح الكل") {
-          products = {};
-          nextSeq = 1;
-          lastProdId = null;
-          localStorage.removeItem("alaqrab_global_tg_items");
-          changed = true;
-          continue;
-        }
-
-        if (text.startsWith("حذف ")) {
-          const targetId = text.replace("حذف ", "").trim();
-          const key = findProductKey(targetId);
-          if (key) {
-            delete products[key];
-            reindexProducts();
-            changed = true;
-          }
-          continue;
-        }
-
-        if (text.startsWith("سعر ")) {
-          const parts = text.replace("سعر ", "").trim().split("|").map(s => s.trim());
-          const key = findProductKey(parts[0] || "");
-          const newPrice = parts[1] || "";
-          if (key && newPrice && products[key]) {
-            products[key].price = newPrice;
-            changed = true;
-          }
-          continue;
-        }
-
-        let mediaType = null;
-        let fileId = null;
-        if (msg.photo && msg.photo.length > 0) {
-          mediaType = "photo";
-          fileId = msg.photo[msg.photo.length - 1].file_id;
-        } else if (msg.video) {
-          mediaType = "video";
-          fileId = msg.video.file_id;
-        }
-
-        if (mediaType && caption.startsWith("تعديل ")) {
-          const targetId = caption.replace("تعديل ", "").trim();
-          const key = findProductKey(targetId);
-          if (key && products[key]) {
-            const url = await getFileUrl(fileId);
-            if (url) {
-              products[key].type = mediaType;
-              products[key].url = url;
-              changed = true;
-            }
-          }
-          continue;
-        }
-
-        if (mediaType) {
-          const existingKey = findProductKey(msgId);
-          if (existingKey && upd.edited_message) {
-            const url = await getFileUrl(fileId);
-            const parsed = parseCaption(caption);
-            if (url) {
-              products[existingKey].type = mediaType;
-              products[existingKey].url = url;
-              changed = true;
-            }
-            if (caption) {
-              products[existingKey].name = parsed.name;
-              products[existingKey].price = parsed.price;
-              changed = true;
-            }
-          } else if (!existingKey) {
-            const url = await getFileUrl(fileId);
-            if (url) {
-              const seqNum = nextSeq++;
-              const idStr = String(seqNum);
-              const parsed = parseCaption(caption);
-              products[idStr] = {
-                id: idStr,
-                seq: seqNum,
-                msgId,
-                type: mediaType,
-                url,
-                name: parsed.name,
-                price: parsed.price
-              };
-              lastProdId = idStr;
-              changed = true;
-            }
-          }
-          continue;
-        }
-
-        if (!upd.edited_message && text && lastProdId && products[lastProdId]) {
-          const target = products[lastProdId];
-          if (text.includes("|")) {
-            const parsed = parseCaption(text);
-            target.name = parsed.name;
-            target.price = parsed.price;
-            changed = true;
-          } else if (/[\d$€£ل\.س]|دولار|ليرة/.test(text) || target.price !== "تواصل للسعر") {
-            target.price = text;
-            changed = true;
-          } else {
-            target.name = text;
-            changed = true;
-          }
-          continue;
-        }
-
-        if (upd.edited_message && caption) {
-          const key = findProductKey(msgId);
-          if (key && products[key]) {
-            const parsed = parseCaption(caption);
-            products[key].name = parsed.name;
-            products[key].price = parsed.price;
-            changed = true;
-          }
-        }
-      }
-
-      setUnlocked(localUnlocked);
-      saveProducts();
-      if (changed) {
-        await pushToScript();
-        setStatus("تم تحديث المنتجات ونشرها للجميع");
-      } else {
-        setStatus("المتجر محدّث");
-      }
-      render();
     }
 
     function render() {
@@ -686,8 +396,8 @@
     }
 
     render();
-    syncBot();
-    setInterval(syncBot, 5000);
+    loadProducts();
+    setInterval(loadProducts, 4000);
   </script>
 
 </body>
