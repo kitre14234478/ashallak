@@ -145,13 +145,15 @@
       display: block;
     }
 
-    header h1 {
+    header h1#store-title {
       margin: 0;
       font-size: 1.18rem;
       font-weight: 900;
       background: linear-gradient(90deg, var(--gold), var(--yellow), var(--sky));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      cursor: pointer;
+      user-select: none;
     }
 
     .social-links {
@@ -274,6 +276,143 @@
       font-size: 1rem;
       font-weight: 700;
     }
+
+    #secretAdminModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 15, 0.82);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .admin-box {
+      width: 100%;
+      max-width: 450px;
+      background: #0c1424;
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold);
+      border-radius: 18px;
+      padding: 20px;
+      color: var(--white);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .admin-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .admin-head h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      color: var(--gold);
+    }
+
+    .admin-close {
+      background: rgba(251, 113, 133, 0.16);
+      color: var(--red);
+      border: 1px solid rgba(251, 113, 133, 0.4);
+      border-radius: 9px;
+      padding: 5px 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .admin-label {
+      display: block;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--sky);
+      margin-bottom: 5px;
+    }
+
+    .admin-input,
+    .admin-select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: #060b14;
+      color: var(--white);
+      margin-bottom: 11px;
+      font-size: 0.92rem;
+    }
+
+    .admin-btn-sky {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--sky), #0284c7);
+      color: #04101c;
+      font-weight: 900;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+
+    .admin-btn-gold {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--gold), #eab308);
+      color: #090d16;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .media-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: -6px;
+      margin-bottom: 10px;
+    }
+
+    .admin-msg {
+      margin-top: 8px;
+      font-size: 0.84rem;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    .admin-items {
+      margin-top: 10px;
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .admin-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      background: rgba(17, 27, 46, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 0.84rem;
+    }
+
+    .admin-del {
+      background: rgba(251, 113, 133, 0.2);
+      color: var(--red);
+      border: 1px solid rgba(251, 113, 133, 0.4);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-weight: 800;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -299,10 +438,10 @@
     <div class="brand">
       <div class="logo-ring">
         <div class="logo-inner">
-          <img src="https://raw.githubusercontent.com/kitre14234478/Scorpion.Store-/main/IMG-20261120-WA0014.jpg" alt="شعار العقرب" />
+          <img src="https://raw.githubusercontent.com/kitre14234478/ashallak/main/IMG-20261120-WA0014.jpg" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/kitre14234478/Scorpion.Store-/main/IMG-20261120-WA0014.jpg';" alt="شعار العقرب" />
         </div>
       </div>
-      <h1>العقرب / Scorpion</h1>
+      <h1 id="store-title">العقرب / Scorpion</h1>
     </div>
 
     <div class="social-links">
@@ -336,11 +475,72 @@
 
   <main class="grid" id="storeGrid"></main>
 
+  <div id="secretAdminModal">
+    <div class="admin-box">
+      <div class="admin-head">
+        <h3>لوحة تعديل المتجر</h3>
+        <button class="admin-close" onclick="closeAdminModal()">إغلاق</button>
+      </div>
+
+      <div id="adminAuthBox">
+        <label class="admin-label" for="adminPassInput">أدخل كلمة السر للتعديل</label>
+        <input type="password" id="adminPassInput" class="admin-input" placeholder="كلمة السر..." />
+        <button class="admin-btn-sky" onclick="verifyAdminPassword()">دخول</button>
+        <div id="adminAuthMsg" class="admin-msg" style="color:var(--red);"></div>
+      </div>
+
+      <div id="adminPanelBox" style="display:none;">
+        <label class="admin-label" for="prodNameInput">اسم المنتج *</label>
+        <input type="text" id="prodNameInput" class="admin-input" placeholder="مثال: منتج مميز" />
+
+        <label class="admin-label" for="prodPriceInput">السعر</label>
+        <input type="text" id="prodPriceInput" class="admin-input" placeholder="مثال: 15$" />
+
+        <label class="admin-label" for="prodTypeSelect">نوع الوسائط</label>
+        <select id="prodTypeSelect" class="admin-select">
+          <option value="image">صورة (Image)</option>
+          <option value="video">فيديو (Video)</option>
+        </select>
+
+        <label class="admin-label" for="prodFileInput">رفع صورة أو فيديو من الجهاز (الحد الأقصى للفيديو 18MB)</label>
+        <input type="file" id="prodFileInput" class="admin-input" accept="image/*,video/*" onchange="handleFileSelection(event)" />
+        <div id="fileInfoNote" class="media-note">يمكنك اختيار ملف من جهازك أو وضع رابط مباشر بالأسفل.</div>
+
+        <label class="admin-label" for="prodUrlInput">رابط الصورة أو الفيديو *</label>
+        <input type="text" id="prodUrlInput" class="admin-input" placeholder="https://... أو يُملأ تلقائياً بعد الرفع" />
+
+        <button id="saveProdBtn" class="admin-btn-gold" onclick="saveProductToGitHub()">نشر المنتج</button>
+        <div id="adminStatusMsg" class="admin-msg"></div>
+
+        <div class="admin-label" style="margin-top:14px;">المنتجات الحالية</div>
+        <div id="adminItemsList" class="admin-items"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const WHATSAPP_NUMBER = "963947895393";
-    const STORE_API = "https://script.google.com/macros/s/AKfycby9UHZMVXKS2fl98hDQCONmi5nmutCWmExaPh_HLV8MRmga6xkilEiDHGmWp1h06zWgcg/exec";
+    const ADMIN_SECRET_PASS = "Scorpion2026";
+    const GH_TOKEN = "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";
+
+    const GH_OWNER = "kitre14234478";
+    const GH_REPO = "ashallak";
+    const GH_BRANCH = "main";
+    const GH_FILE_PATH = "products.json";
+    const GH_MEDIA_DIR = "media";
+    const STORE_JSON_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_FILE_PATH}`;
+
+    const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
+
     let products = [];
     let lastSignature = "";
+    let isUnlocked = false;
+    let currentFileSha = "";
+    let selectedMediaFile = null;
+
+    function formatMB(bytes) {
+      return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    }
 
     function escapeHtml(str) {
       return String(str ?? "")
@@ -371,38 +571,32 @@
       return false;
     }
 
+    function extractProductsList(data) {
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.products)) return data.products;
+      if (data && typeof data === "object") {
+        return Object.values(data).filter(v => v && typeof v === "object" && "name" in v);
+      }
+      return [];
+    }
+
     async function loadProducts() {
       try {
-        const res = await fetch(`${STORE_API}?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) {
-          console.error("HTTP error:", res.status);
-          return;
-        }
+        const res = await fetch(`${STORE_JSON_URL}?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
         const data = await res.json();
-
-        let nextList = [];
-        if (data && Array.isArray(data.products)) {
-          nextList = data.products;
-        } else if (Array.isArray(data)) {
-          nextList = data;
-        } else if (data && typeof data === "object") {
-          nextList = Object.values(data).filter(v => v && typeof v === "object" && "name" in v);
-        }
+        const nextList = extractProductsList(data);
 
         const nextSignature = getProductsSignature(nextList);
-        if (nextSignature === lastSignature) {
-          return;
-        }
-
-        if (isAnyVideoPlaying()) {
-          return;
-        }
+        if (nextSignature === lastSignature) return;
+        if (isAnyVideoPlaying()) return;
 
         lastSignature = nextSignature;
         products = nextList;
         render();
+        renderAdminItems();
       } catch (err) {
-        console.error("Fetch error:", err);
+        console.error("Load products error:", err);
       }
     }
 
@@ -452,6 +646,316 @@
               </a>
             </div>
           </article>
+        `;
+      }).join("");
+    }
+
+    function handleFileSelection(event) {
+      const file = event.target.files && event.target.files[0];
+      const note = document.getElementById("fileInfoNote");
+      const status = document.getElementById("adminStatusMsg");
+      const typeSelect = document.getElementById("prodTypeSelect");
+
+      selectedMediaFile = null;
+      status.textContent = "";
+
+      if (!file) {
+        note.style.color = "var(--muted)";
+        note.textContent = "يمكنك اختيار ملف من جهازك أو وضع رابط مباشر بالأسفل.";
+        return;
+      }
+
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name || "");
+      typeSelect.value = isVideo ? "video" : "image";
+
+      if (isVideo && file.size > MAX_VIDEO_BYTES) {
+        event.target.value = "";
+        note.style.color = "var(--red)";
+        note.textContent = `حجم الفيديو (${formatMB(file.size)}) أكبر من 18MB؛ الفيديو كبير ويجب تصغيره أولاً.`;
+        status.style.color = "var(--red)";
+        status.textContent = "الفيديو أكبر من 18 ميغا، يرجى تصغير حجمه ثم إعادة اختياره.";
+        return;
+      }
+
+      selectedMediaFile = file;
+      note.style.color = "var(--wa)";
+      note.textContent = `تم اختيار الملف (${formatMB(file.size)}) وجاهز للرفع.`;
+    }
+
+    let tapCount = 0;
+    let tapTimer = null;
+
+    document.getElementById("store-title").addEventListener("click", () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      if (tapCount >= 3) {
+        tapCount = 0;
+        openAdminModal();
+      } else {
+        tapTimer = setTimeout(() => {
+          tapCount = 0;
+        }, 750);
+      }
+    });
+
+    function openAdminModal() {
+      document.getElementById("secretAdminModal").style.display = "flex";
+      if (!isUnlocked) {
+        document.getElementById("adminAuthBox").style.display = "block";
+        document.getElementById("adminPanelBox").style.display = "none";
+        document.getElementById("adminPassInput").value = "";
+        document.getElementById("adminAuthMsg").textContent = "";
+      } else {
+        renderAdminItems();
+      }
+    }
+
+    function closeAdminModal() {
+      document.getElementById("secretAdminModal").style.display = "none";
+    }
+
+    function verifyAdminPassword() {
+      const pass = document.getElementById("adminPassInput").value.trim();
+      const msg = document.getElementById("adminAuthMsg");
+
+      if (pass !== ADMIN_SECRET_PASS) {
+        msg.style.color = "var(--red)";
+        msg.textContent = "كلمة السر غير صحيحة.";
+        return;
+      }
+
+      isUnlocked = true;
+      document.getElementById("adminAuthBox").style.display = "none";
+      document.getElementById("adminPanelBox").style.display = "block";
+      renderAdminItems();
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 0x8000;
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(bin);
+    }
+
+    function encodeUtf8ToBase64(str) {
+      const bytes = new TextEncoder().encode(str);
+      return arrayBufferToBase64(bytes.buffer);
+    }
+
+    function decodeBase64ToUtf8(b64) {
+      const bin = atob(b64.replace(/\n/g, ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) {
+        bytes[i] = bin.charCodeAt(i);
+      }
+      return new TextDecoder().decode(bytes);
+    }
+
+    async function uploadMediaFileToGitHub(file) {
+      const buffer = await file.arrayBuffer();
+      const base64Content = arrayBufferToBase64(buffer);
+      const extMatch = (file.name || "").match(/\.[a-zA-Z0-9]+$/);
+      const ext = extMatch ? extMatch[0].toLowerCase() : (file.type.startsWith("video/") ? ".mp4" : ".jpg");
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`;
+      const repoPath = `${GH_MEDIA_DIR}/${fileName}`;
+
+      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${repoPath}`;
+      const res = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${GH_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: `Upload product media ${fileName}`,
+          content: base64Content,
+          branch: GH_BRANCH
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Media upload failed (${res.status}): ${errText}`);
+      }
+
+      return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${repoPath}`;
+    }
+
+    async function fetchGitHubProductsFile() {
+      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}?ref=${GH_BRANCH}&t=${Date.now()}`;
+      const res = await fetch(apiUrl, {
+        headers: {
+          Authorization: `Bearer ${GH_TOKEN}`,
+          Accept: "application/vnd.github+json"
+        }
+      });
+
+      if (res.status === 404) {
+        currentFileSha = "";
+        return [];
+      }
+      if (!res.ok) {
+        throw new Error(`GitHub read failed (${res.status})`);
+      }
+
+      const fileData = await res.json();
+      currentFileSha = fileData.sha || "";
+      const decoded = fileData.content ? decodeBase64ToUtf8(fileData.content) : "[]";
+      return extractProductsList(JSON.parse(decoded));
+    }
+
+    async function writeGitHubProductsFile(nextList, commitMessage) {
+      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`;
+      const body = {
+        message: commitMessage,
+        content: encodeUtf8ToBase64(JSON.stringify(nextList, null, 2)),
+        branch: GH_BRANCH
+      };
+      if (currentFileSha) {
+        body.sha = currentFileSha;
+      }
+
+      const res = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${GH_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`GitHub write failed (${res.status}): ${errText}`);
+      }
+
+      const updated = await res.json();
+      if (updated && updated.content && updated.content.sha) {
+        currentFileSha = updated.content.sha;
+      }
+    }
+
+    async function saveProductToGitHub() {
+      const btn = document.getElementById("saveProdBtn");
+      const status = document.getElementById("adminStatusMsg");
+      const name = document.getElementById("prodNameInput").value.trim();
+      const price = document.getElementById("prodPriceInput").value.trim();
+      const type = document.getElementById("prodTypeSelect").value;
+      const urlInput = document.getElementById("prodUrlInput");
+      let finalUrl = urlInput.value.trim();
+
+      if (!name) {
+        status.style.color = "var(--red)";
+        status.textContent = "يرجى إدخال اسم المنتج.";
+        return;
+      }
+
+      if (selectedMediaFile && type === "video" && selectedMediaFile.size > MAX_VIDEO_BYTES) {
+        status.style.color = "var(--red)";
+        status.textContent = `الفيديو (${formatMB(selectedMediaFile.size)}) أكبر من 18MB؛ يرجى تصغيره أولاً.`;
+        return;
+      }
+
+      if (!selectedMediaFile && !finalUrl) {
+        status.style.color = "var(--red)";
+        status.textContent = "اختر صورة/فيديو من الجهاز أو أدخل رابطاً مباشراً.";
+        return;
+      }
+
+      btn.disabled = true;
+      status.style.color = "var(--sky)";
+
+      try {
+        if (selectedMediaFile) {
+          status.textContent = "جاري رفع الملف إلى GitHub...";
+          finalUrl = await uploadMediaFileToGitHub(selectedMediaFile);
+          urlInput.value = finalUrl;
+        }
+
+        status.textContent = "جاري حفظ المنتج...";
+        const latestList = await fetchGitHubProductsFile();
+        const maxSeq = latestList.reduce((m, item) => Math.max(m, Number(item.seq || item.id || 0)), 0);
+        const nextSeq = maxSeq + 1;
+
+        latestList.push({
+          id: String(nextSeq),
+          seq: nextSeq,
+          name: name,
+          price: price,
+          type: type,
+          url: finalUrl
+        });
+
+        await writeGitHubProductsFile(latestList, `Add product #${nextSeq}: ${name}`);
+
+        products = latestList;
+        lastSignature = getProductsSignature(products);
+        render();
+        renderAdminItems();
+
+        document.getElementById("prodNameInput").value = "";
+        document.getElementById("prodPriceInput").value = "";
+        document.getElementById("prodFileInput").value = "";
+        document.getElementById("prodUrlInput").value = "";
+        document.getElementById("fileInfoNote").style.color = "var(--muted)";
+        document.getElementById("fileInfoNote").textContent = "يمكنك اختيار ملف من جهازك أو وضع رابط مباشر بالأسفل.";
+        selectedMediaFile = null;
+
+        status.style.color = "var(--wa)";
+        status.textContent = "تم نشر المنتج وحفظه بنجاح.";
+      } catch (err) {
+        console.error(err);
+        status.style.color = "var(--red)";
+        status.textContent = "تعذر النشر؛ تأكد من صلاحية الرمز على المستودع أو حجم الملف.";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteProductFromGitHub(id) {
+      if (!confirm("هل تريد حذف هذا المنتج؟")) return;
+      const status = document.getElementById("adminStatusMsg");
+      status.style.color = "var(--sky)";
+      status.textContent = "جاري الحذف...";
+
+      try {
+        const latestList = await fetchGitHubProductsFile();
+        const filtered = latestList.filter(item => String(item.id || item.seq || "") !== String(id));
+        await writeGitHubProductsFile(filtered, `Delete product #${id}`);
+
+        products = filtered;
+        lastSignature = getProductsSignature(products);
+        render();
+        renderAdminItems();
+
+        status.style.color = "var(--wa)";
+        status.textContent = "تم حذف المنتج بنجاح.";
+      } catch (err) {
+        console.error(err);
+        status.style.color = "var(--red)";
+        status.textContent = "تعذر حذف المنتج.";
+      }
+    }
+
+    function renderAdminItems() {
+      const box = document.getElementById("adminItemsList");
+      if (!box) return;
+      if (!products.length) {
+        box.innerHTML = `<div style="color:var(--muted);font-size:0.82rem;">لا توجد منتجات حالياً.</div>`;
+        return;
+      }
+      box.innerHTML = products.map(item => {
+        const idVal = item.id || item.seq || "";
+        return `
+          <div class="admin-row">
+            <span>#${escapeHtml(idVal)} — ${escapeHtml(item.name || "منتج")} (${escapeHtml(item.price || "")})</span>
+            <button class="admin-del" onclick="deleteProductFromGitHub('${escapeHtml(idVal)}')">حذف</button>
+          </div>
         `;
       }).join("");
     }
