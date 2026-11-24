@@ -378,9 +378,10 @@
 
     .admin-msg {
       margin-top: 8px;
-      font-size: 0.84rem;
+      font-size: 0.82rem;
       text-align: center;
       min-height: 18px;
+      word-break: break-word;
     }
 
     .admin-items {
@@ -779,7 +780,7 @@
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Media upload failed (${res.status}): ${errText}`);
+        throw new Error(`Upload (${res.status}): ${errText}`);
       }
 
       return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${repoPath}`;
@@ -799,7 +800,8 @@
         return [];
       }
       if (!res.ok) {
-        throw new Error(`GitHub read failed (${res.status})`);
+        const errText = await res.text();
+        throw new Error(`Read (${res.status}): ${errText}`);
       }
 
       const fileData = await res.json();
@@ -831,7 +833,7 @@
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`GitHub write failed (${res.status}): ${errText}`);
+        throw new Error(`Write (${res.status}): ${errText}`);
       }
 
       const updated = await res.json();
@@ -911,7 +913,7 @@
       } catch (err) {
         console.error(err);
         status.style.color = "var(--red)";
-        status.textContent = "تعذر النشر؛ تأكد من صلاحية الرمز على المستودع أو حجم الملف.";
+        status.textContent = `تعذر النشر: ${err && err.message ? err.message : "خطأ غير معروف"}`;
       } finally {
         btn.disabled = false;
       }
@@ -938,7 +940,7 @@
       } catch (err) {
         console.error(err);
         status.style.color = "var(--red)";
-        status.textContent = "تعذر حذف المنتج.";
+        status.textContent = `تعذر الحذف: ${err && err.message ? err.message : "خطأ غير معروف"}`;
       }
     }
 
