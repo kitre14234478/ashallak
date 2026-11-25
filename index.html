@@ -521,14 +521,12 @@
 
   <script>
     const WHATSAPP_NUMBER = "963947895393";
-    const ADMIN_SECRET_PASS = "Scorpion2026";
-    const GH_TOKEN = "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";
+    const WORKER_URL = "https://scorpion2026.hymkj9882.workers.dev";
 
     const GH_OWNER = "kitre14234478";
     const GH_REPO = "ashallak";
     const GH_BRANCH = "main";
     const GH_FILE_PATH = "products.json";
-    const GH_MEDIA_DIR = "media";
     const STORE_JSON_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_FILE_PATH}`;
 
     const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
@@ -536,7 +534,7 @@
     let products = [];
     let lastSignature = "";
     let isUnlocked = false;
-    let currentFileSha = "";
+    let adminPassword = "";
     let selectedMediaFile = null;
 
     function formatMB(bytes) {
@@ -707,6 +705,8 @@
         document.getElementById("adminPassInput").value = "";
         document.getElementById("adminAuthMsg").textContent = "";
       } else {
+        document.getElementById("adminAuthBox").style.display = "none";
+        document.getElementById("adminPanelBox").style.display = "block";
         renderAdminItems();
       }
     }
@@ -719,12 +719,13 @@
       const pass = document.getElementById("adminPassInput").value.trim();
       const msg = document.getElementById("adminAuthMsg");
 
-      if (pass !== ADMIN_SECRET_PASS) {
+      if (!pass) {
         msg.style.color = "var(--red)";
-        msg.textContent = "كلمة السر غير صحيحة.";
+        msg.textContent = "يرجى إدخال كلمة السر.";
         return;
       }
 
+      adminPassword = pass;
       isUnlocked = true;
       document.getElementById("adminAuthBox").style.display = "none";
       document.getElementById("adminPanelBox").style.display = "block";
@@ -741,105 +742,44 @@
       return btoa(bin);
     }
 
-    function encodeUtf8ToBase64(str) {
-      const bytes = new TextEncoder().encode(str);
-      return arrayBufferToBase64(bytes.buffer);
-    }
+    async function callWorker(payload) {
+      const res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: adminPassword,
+          ...payload
+        })
+      });
 
-    function decodeBase64ToUtf8(b64) {
-      const bin = atob(b64.replace(/\n/g, ""));
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) {
-        bytes[i] = bin.charCodeAt(i);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (res.status === 401) {
+          isUnlocked = false;
+          adminPassword = "";
+          document.getElementById("adminPanelBox").style.display = "none";
+          document.getElementById("adminAuthBox").style.display = "block";
+          document.getElementById("adminAuthMsg").textContent = data.error || "كلمة السر غير صحيحة.";
+        }
+        throw new Error(data.error || `Request failed (${res.status})`);
       }
-      return new TextDecoder().decode(bytes);
+      return data;
     }
 
-    async function uploadMediaFileToGitHub(file) {
+    async function uploadMediaFileToWorker(file) {
       const buffer = await file.arrayBuffer();
       const base64Content = arrayBufferToBase64(buffer);
       const extMatch = (file.name || "").match(/\.[a-zA-Z0-9]+$/);
       const ext = extMatch ? extMatch[0].toLowerCase() : (file.type.startsWith("video/") ? ".mp4" : ".jpg");
       const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`;
-      const repoPath = `${GH_MEDIA_DIR}/${fileName}`;
 
-      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${repoPath}`;
-      const res = await fetch(apiUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${GH_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: `Upload product media ${fileName}`,
-          content: base64Content,
-          branch: GH_BRANCH
-        })
+      const data = await callWorker({
+        action: "upload",
+        fileName,
+        base64Content
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Upload (${res.status}): ${errText}`);
-      }
-
-      return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${repoPath}`;
-    }
-
-    async function fetchGitHubProductsFile() {
-      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}?ref=${GH_BRANCH}&t=${Date.now()}`;
-      const res = await fetch(apiUrl, {
-        headers: {
-          Authorization: `Bearer ${GH_TOKEN}`,
-          Accept: "application/vnd.github+json"
-        }
-      });
-
-      if (res.status === 404) {
-        currentFileSha = "";
-        return [];
-      }
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Read (${res.status}): ${errText}`);
-      }
-
-      const fileData = await res.json();
-      currentFileSha = fileData.sha || "";
-      const decoded = fileData.content ? decodeBase64ToUtf8(fileData.content) : "[]";
-      return extractProductsList(JSON.parse(decoded));
-    }
-
-    async function writeGitHubProductsFile(nextList, commitMessage) {
-      const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`;
-      const body = {
-        message: commitMessage,
-        content: encodeUtf8ToBase64(JSON.stringify(nextList, null, 2)),
-        branch: GH_BRANCH
-      };
-      if (currentFileSha) {
-        body.sha = currentFileSha;
-      }
-
-      const res = await fetch(apiUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${GH_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Write (${res.status}): ${errText}`);
-      }
-
-      const updated = await res.json();
-      if (updated && updated.content && updated.content.sha) {
-        currentFileSha = updated.content.sha;
-      }
+      return data.url;
     }
 
     async function saveProductToGitHub() {
@@ -874,28 +814,21 @@
 
       try {
         if (selectedMediaFile) {
-          status.textContent = "جاري رفع الملف إلى GitHub...";
-          finalUrl = await uploadMediaFileToGitHub(selectedMediaFile);
+          status.textContent = "جاري رفع الملف...";
+          finalUrl = await uploadMediaFileToWorker(selectedMediaFile);
           urlInput.value = finalUrl;
         }
 
         status.textContent = "جاري حفظ المنتج...";
-        const latestList = await fetchGitHubProductsFile();
-        const maxSeq = latestList.reduce((m, item) => Math.max(m, Number(item.seq || item.id || 0)), 0);
-        const nextSeq = maxSeq + 1;
-
-        latestList.push({
-          id: String(nextSeq),
-          seq: nextSeq,
-          name: name,
-          price: price,
-          type: type,
+        const data = await callWorker({
+          action: "add",
+          name,
+          price,
+          type,
           url: finalUrl
         });
 
-        await writeGitHubProductsFile(latestList, `Add product #${nextSeq}: ${name}`);
-
-        products = latestList;
+        products = Array.isArray(data.products) ? data.products : products;
         lastSignature = getProductsSignature(products);
         render();
         renderAdminItems();
@@ -926,11 +859,12 @@
       status.textContent = "جاري الحذف...";
 
       try {
-        const latestList = await fetchGitHubProductsFile();
-        const filtered = latestList.filter(item => String(item.id || item.seq || "") !== String(id));
-        await writeGitHubProductsFile(filtered, `Delete product #${id}`);
+        const data = await callWorker({
+          action: "delete",
+          id
+        });
 
-        products = filtered;
+        products = Array.isArray(data.products) ? data.products : products.filter(item => String(item.id || item.seq || "") !== String(id));
         lastSignature = getProductsSignature(products);
         render();
         renderAdminItems();
