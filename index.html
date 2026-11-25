@@ -90,7 +90,7 @@
     @keyframes triUp { 0%, 100% { transform: translate(0, 0) rotate(-12deg); } 50% { transform: translate(12px, -24px) rotate(10deg); } }
     @keyframes triDown { 0%, 100% { transform: translate(0, 0) rotate(155deg); } 50% { transform: translate(-12px, 22px) rotate(135deg); } }
 
-    header, main {
+    header, main, footer {
       position: relative;
       z-index: 2;
     }
@@ -275,6 +275,22 @@
       color: var(--muted);
       font-size: 1rem;
       font-weight: 700;
+    }
+
+    .site-footer {
+      max-width: 1140px;
+      margin: 34px auto 0;
+      padding: 16px 14px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      border-top: 1px solid rgba(246, 196, 69, 0.16);
+    }
+
+    .site-footer span {
+      color: var(--gold);
+      font-weight: 800;
     }
 
     #secretAdminModal {
@@ -475,6 +491,10 @@
   </header>
 
   <main class="grid" id="storeGrid"></main>
+
+  <footer class="site-footer">
+    جميع الحقوق محفوظة لـ <span>أسهل لك</span>
+  </footer>
 
   <div id="secretAdminModal">
     <div class="admin-box">
