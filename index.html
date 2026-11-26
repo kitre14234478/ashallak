@@ -90,7 +90,7 @@
     @keyframes triUp { 0%, 100% { transform: translate(0, 0) rotate(-12deg); } 50% { transform: translate(12px, -24px) rotate(10deg); } }
     @keyframes triDown { 0%, 100% { transform: translate(0, 0) rotate(155deg); } 50% { transform: translate(-12px, 22px) rotate(135deg); } }
 
-    header, main, footer {
+    header, main, nav {
       position: relative;
       z-index: 2;
     }
@@ -192,9 +192,43 @@
       box-shadow: 0 4px 16px rgba(251, 113, 133, 0.25);
     }
 
+    /* ===== الأقسام ===== */
+    .cats {
+      max-width: 1140px;
+      margin: 16px auto 0;
+      padding: 0 14px;
+      display: flex;
+      gap: 9px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cats::-webkit-scrollbar { display: none; }
+
+    .cat-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
+      background: var(--surface);
+      color: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 9px 18px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .cat-btn:active { transform: scale(0.96); }
+    .cat-btn.active {
+      background: linear-gradient(135deg, var(--gold), #eab308);
+      color: #090d16;
+      border-color: transparent;
+      box-shadow: 0 4px 16px rgba(246, 196, 69, 0.35);
+    }
+
     .grid {
       max-width: 1140px;
-      margin: 20px auto;
+      margin: 16px auto 20px;
       padding: 0 14px;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
@@ -238,6 +272,18 @@
       font-size: 0.75rem;
       font-weight: 800;
     }
+    .cat-tag {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(5, 9, 18, 0.86);
+      color: var(--gold);
+      border: 1px solid rgba(246, 196, 69, 0.45);
+      padding: 3px 9px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
 
     .card-body {
       padding: 15px;
@@ -275,22 +321,6 @@
       color: var(--muted);
       font-size: 1rem;
       font-weight: 700;
-    }
-
-    .site-footer {
-      max-width: 1140px;
-      margin: 34px auto 0;
-      padding: 16px 14px 0;
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.86rem;
-      font-weight: 700;
-      border-top: 1px solid rgba(246, 196, 69, 0.16);
-    }
-
-    .site-footer span {
-      color: var(--gold);
-      font-weight: 800;
     }
 
     #secretAdminModal {
@@ -430,6 +460,58 @@
       font-weight: 800;
       cursor: pointer;
     }
+
+    /* ===== نافذة اختيار القسم ===== */
+    #catPickModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 15, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .cat-pick-box {
+      width: 100%;
+      max-width: 380px;
+      background: #0c1424;
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+    }
+    .cat-pick-box h3 {
+      margin: 0 0 14px;
+      text-align: center;
+      color: var(--gold);
+      font-size: 1.1rem;
+    }
+    .cat-pick-opt {
+      width: 100%;
+      padding: 13px;
+      margin-bottom: 9px;
+      border-radius: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      background: rgba(17, 27, 46, 0.9);
+      color: var(--white);
+      font-size: 0.98rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .cat-pick-opt:active { background: rgba(56, 189, 248, 0.25); }
+    .cat-pick-cancel {
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(251, 113, 133, 0.4);
+      background: rgba(251, 113, 133, 0.14);
+      color: var(--red);
+      font-weight: 800;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -490,12 +572,11 @@
     </div>
   </header>
 
+  <nav class="cats" id="catsBar" aria-label="الأقسام"></nav>
+
   <main class="grid" id="storeGrid"></main>
 
-  <footer class="site-footer">
-    جميع الحقوق محفوظة لـ <span>أسهل لك</span>
-  </footer>
-
+  <!-- نافذة الإدارة -->
   <div id="secretAdminModal">
     <div class="admin-box">
       <div class="admin-head">
@@ -539,6 +620,15 @@
     </div>
   </div>
 
+  <!-- نافذة اختيار القسم -->
+  <div id="catPickModal">
+    <div class="cat-pick-box">
+      <h3>في أي قسم تريد نشر المنتج؟</h3>
+      <div id="catPickOptions"></div>
+      <button class="cat-pick-cancel" onclick="closeCatPick()">إلغاء</button>
+    </div>
+  </div>
+
   <script>
     const WHATSAPP_NUMBER = "963947895393";
     const WORKER_URL = "https://scorpion2026.hymkj9882.workers.dev";
@@ -551,11 +641,26 @@
 
     const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
 
+    // الأقسام (id يُحفظ مع المنتج في الحقل category)
+    const CATEGORIES = [
+      { id: "casual",  label: "كاجوال" },
+      { id: "classic", label: "كلاسيكي" },
+      { id: "custom",  label: "طباعة حسب الطلب" },
+      { id: "offers",  label: "عروضنا" }
+    ];
+
+    function categoryLabel(id) {
+      const c = CATEGORIES.find(x => x.id === id);
+      return c ? c.label : "";
+    }
+
     let products = [];
     let lastSignature = "";
     let isUnlocked = false;
     let adminPassword = "";
     let selectedMediaFile = null;
+    let currentCat = "all";
+    let pendingProduct = null;
 
     function formatMB(bytes) {
       return (bytes / (1024 * 1024)).toFixed(2) + " MB";
@@ -577,7 +682,8 @@
           type: item.type || "",
           url: item.url || "",
           name: item.name || "",
-          price: item.price || ""
+          price: item.price || "",
+          category: item.category || ""
         }))
       );
     }
@@ -619,17 +725,36 @@
       }
     }
 
+    function renderTabs() {
+      const bar = document.getElementById("catsBar");
+      if (!bar) return;
+      const tabs = [{ id: "all", label: "الكل" }, ...CATEGORIES];
+      bar.innerHTML = tabs.map(t =>
+        `<button class="cat-btn${t.id === currentCat ? " active" : ""}" onclick="setCategory('${t.id}')">${t.label}</button>`
+      ).join("");
+    }
+
+    function setCategory(id) {
+      currentCat = id;
+      renderTabs();
+      render();
+    }
+
     function render() {
       const grid = document.getElementById("storeGrid");
       if (!grid) return;
 
-      const list = [...products]
+      let list = [...products]
         .filter(item => item && typeof item === "object")
         .sort((a, b) => Number(a.seq || a.id || 0) - Number(b.seq || b.id || 0))
         .reverse();
 
+      if (currentCat !== "all") {
+        list = list.filter(item => item.category === currentCat);
+      }
+
       if (list.length === 0) {
-        grid.innerHTML = `<div class="empty">لا يوجد عروض لهذا اليوم</div>`;
+        grid.innerHTML = `<div class="empty">${currentCat === "all" ? "لا يوجد عروض لهذا اليوم" : "لا توجد منتجات في هذا القسم حالياً"}</div>`;
         return;
       }
 
@@ -638,6 +763,7 @@
         const safeName = escapeHtml(item.name || "منتج");
         const safePrice = escapeHtml(item.price || "");
         const safeUrl = escapeHtml(item.url || "");
+        const catName = categoryLabel(item.category);
 
         const media = item.type === "video"
           ? `<video src="${safeUrl}" controls playsinline preload="auto"></video>`
@@ -652,6 +778,7 @@
           <article class="card">
             <div class="media-box">
               <span class="pid-tag">#${safeId}</span>
+              ${catName ? `<span class="cat-tag">${escapeHtml(catName)}</span>` : ""}
               ${media}
             </div>
             <div class="card-body">
@@ -802,14 +929,13 @@
       return data.url;
     }
 
-    async function saveProductToGitHub() {
-      const btn = document.getElementById("saveProdBtn");
+    /* الخطوة 1: التحقق من الحقول ثم إظهار نافذة اختيار القسم */
+    function saveProductToGitHub() {
       const status = document.getElementById("adminStatusMsg");
       const name = document.getElementById("prodNameInput").value.trim();
       const price = document.getElementById("prodPriceInput").value.trim();
       const type = document.getElementById("prodTypeSelect").value;
-      const urlInput = document.getElementById("prodUrlInput");
-      let finalUrl = urlInput.value.trim();
+      const finalUrl = document.getElementById("prodUrlInput").value.trim();
 
       if (!name) {
         status.style.color = "var(--red)";
@@ -829,6 +955,35 @@
         return;
       }
 
+      status.textContent = "";
+      pendingProduct = { name, price, type };
+      openCatPick();
+    }
+
+    function openCatPick() {
+      document.getElementById("catPickOptions").innerHTML = CATEGORIES.map(c =>
+        `<button class="cat-pick-opt" onclick="publishWithCategory('${c.id}')">${c.label}</button>`
+      ).join("");
+      document.getElementById("catPickModal").style.display = "flex";
+    }
+
+    function closeCatPick() {
+      document.getElementById("catPickModal").style.display = "none";
+      pendingProduct = null;
+    }
+
+    /* الخطوة 2: النشر الفعلي بعد اختيار القسم (نفس طريقة الرفع السابقة + حقل category) */
+    async function publishWithCategory(category) {
+      if (!pendingProduct) return;
+      const { name, price, type } = pendingProduct;
+      document.getElementById("catPickModal").style.display = "none";
+      pendingProduct = null;
+
+      const btn = document.getElementById("saveProdBtn");
+      const status = document.getElementById("adminStatusMsg");
+      const urlInput = document.getElementById("prodUrlInput");
+      let finalUrl = urlInput.value.trim();
+
       btn.disabled = true;
       status.style.color = "var(--sky)";
 
@@ -845,6 +1000,7 @@
           name,
           price,
           type,
+          category,
           url: finalUrl
         });
 
@@ -862,7 +1018,7 @@
         selectedMediaFile = null;
 
         status.style.color = "var(--wa)";
-        status.textContent = "تم نشر المنتج وحفظه بنجاح.";
+        status.textContent = `تم نشر المنتج في قسم "${categoryLabel(category)}" بنجاح.`;
       } catch (err) {
         console.error(err);
         status.style.color = "var(--red)";
@@ -907,15 +1063,17 @@
       }
       box.innerHTML = products.map(item => {
         const idVal = item.id || item.seq || "";
+        const cat = categoryLabel(item.category);
         return `
           <div class="admin-row">
-            <span>#${escapeHtml(idVal)} — ${escapeHtml(item.name || "منتج")} (${escapeHtml(item.price || "")})</span>
+            <span>#${escapeHtml(idVal)} — ${escapeHtml(item.name || "منتج")} (${escapeHtml(item.price || "")})${cat ? ` — ${escapeHtml(cat)}` : ""}</span>
             <button class="admin-del" onclick="deleteProductFromGitHub('${escapeHtml(idVal)}')">حذف</button>
           </div>
         `;
       }).join("");
     }
 
+    renderTabs();
     render();
     loadProducts();
     setInterval(loadProducts, 60000);
