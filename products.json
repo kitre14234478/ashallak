@@ -25,5 +25,14 @@
     "type": "image",
     "category": "custom",
     "url": "https://raw.githubusercontent.com/kitre14234478/ashallak/main/media/1795739764159_h0fc3.webp"
+  },
+  {
+    "id": "4",
+    "seq": 4,
+    "name": "انمي",
+    "price": "15$",
+    "type": "image",
+    "category": "custom",
+    "url": "https://raw.githubusercontent.com/kitre14234478/ashallak/main/media/1795739860265_5zwer.webp"
   }
 ]
